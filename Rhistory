@@ -1,0 +1,512 @@
+energia <- siga %>%
+filter(SigUFPrincipal %in% ufs_ne) %>%
+mutate(
+Estado = case_match(
+SigUFPrincipal,
+"AL" ~ "Alagoas",
+"BA" ~ "Bahia",
+"CE" ~ "Ceará",
+"MA" ~ "Maranhão",
+"PB" ~ "Paraíba",
+"PE" ~ "Pernambuco",
+"PI" ~ "Piauí",
+"RN" ~ "Rio Grande do Norte",
+"SE" ~ "Sergipe"
+),
+# Busca a coluna dinamicamente usando .data[[coluna_data]]
+Data = dmy(.data[[coluna_data]]),
+Ano = year(Data)
+) %>%
+filter(Ano >= 2010 & Ano <= 2024) %>%
+group_by(Estado, Ano) %>%
+summarise(
+Potencia_MW = sum(as.numeric(MdaPotenciaFiscalizadaKw), na.rm = TRUE) / 1000,
+.groups = "drop"
+)
+#===========================================================
+# 2. BASE IDHM (data.xlsx)
+#===========================================================
+idhm_raw <- read_excel("data.xlsx")
+idhm <- idhm_raw %>%
+select(
+Territorialidades,
+matches("^IDHM [0-9]{4}$")
+) %>%
+pivot_longer(
+cols = -Territorialidades,
+names_to = "Ano",
+values_to = "IDHM"
+) %>%
+mutate(
+Ano = as.integer(gsub("IDHM ", "", Ano)),
+Estado = trimws(Territorialidades)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+) %>%
+select(Estado, Ano, IDHM)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+# NOTA: Ajuste os nomes das colunas abaixo ("Nome_da_Coluna_Estado", etc.)
+# de acordo com o que aparecer no seu names(pop_raw)
+populacao <- pop_raw %>%
+# Exemplo caso a planilha venha no formato longo (Estado, Ano, Populacao):
+rename(
+Estado = 1, # Se a primeira coluna for o estado, você pode usar o índice
+Ano = 2,
+Populacao = 3
+) %>%
+mutate(
+Estado = trimws(Estado),
+Ano = as.integer(Ano)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+)
+#===========================================================
+# 4. BASE PIB (pib-per-capita-r.csv)
+#===========================================================
+# Usando read.csv ou read.csv2 dependendo do separador (vírgula ou ponto-e-vírgula)
+pib_raw <- read.csv("pib-per-capita-r.csv", fileEncoding = "UTF-8")
+# NOTA: Ajuste a limpeza abaixo conforme a estrutura real do seu CSV
+pib_final <- pib_raw %>%
+rename(
+Estado = 1,
+Ano = 2,
+PIB_per_capita = 3
+) %>%
+mutate(
+Estado = trimws(Estado),
+Ano = as.integer(Ano),
+PIB_per_capita = as.numeric(PIB_per_capita)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+)
+#===========================================================
+# PACOTES
+#===========================================================
+library(readr)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+library(corrplot)
+#===========================================================
+# CONFIGURAÇÕES DE FILTROS (NORDESTE)
+#===========================================================
+ufs_ne <- c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE")
+estados_ne <- c(
+"Alagoas", "Bahia", "Ceará", "Maranhão", "Paraíba",
+"Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe"
+)
+#===========================================================
+#===========================================================
+# 1. BASE ANEEL (SIGA)
+#===========================================================
+siga <- read.csv2(
+"siga-empreendimentos-geracao.csv",
+fileEncoding = "Latin1",
+stringsAsFactors = FALSE
+)
+# Identifica automaticamente a coluna que contém "EntradaOperacao" ignorando maiúsculas/minúsculas
+coluna_data <- names(siga)[str_detect(names(siga), regex("EntradaOperacao", ignore_case = TRUE))][1]
+energia <- siga %>%
+filter(SigUFPrincipal %in% ufs_ne) %>%
+mutate(
+Estado = case_match(
+SigUFPrincipal,
+"AL" ~ "Alagoas",
+"BA" ~ "Bahia",
+"CE" ~ "Ceará",
+"MA" ~ "Maranhão",
+"PB" ~ "Paraíba",
+"PE" ~ "Pernambuco",
+"PI" ~ "Piauí",
+"RN" ~ "Rio Grande do Norte",
+"SE" ~ "Sergipe"
+),
+# Busca a coluna dinamicamente usando .data[[coluna_data]]
+Data = dmy(.data[[coluna_data]]),
+Ano = year(Data)
+) %>%
+filter(Ano >= 2010 & Ano <= 2024) %>%
+group_by(Estado, Ano) %>%
+summarise(
+Potencia_MW = sum(as.numeric(MdaPotenciaFiscalizadaKw), na.rm = TRUE) / 1000,
+.groups = "drop"
+)
+#===========================================================
+# 2. BASE IDHM (data.xlsx)
+#===========================================================
+idhm_raw <- read_excel("data.xlsx")
+idhm <- idhm_raw %>%
+select(
+Territorialidades,
+matches("^IDHM [0-9]{4}$")
+) %>%
+pivot_longer(
+cols = -Territorialidades,
+names_to = "Ano",
+values_to = "IDHM"
+) %>%
+mutate(
+Ano = as.integer(gsub("IDHM ", "", Ano)),
+Estado = trimws(Territorialidades)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+) %>%
+select(Estado, Ano, IDHM)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+# NOTA: Ajuste os nomes das colunas abaixo ("Nome_da_Coluna_Estado", etc.)
+# de acordo com o que aparecer no seu names(pop_raw)
+populacao <- pop_raw %>%
+# Exemplo caso a planilha venha no formato longo (Estado, Ano, Populacao):
+rename(
+Estado = 1, # Se a primeira coluna for o estado, você pode usar o índice
+Ano = 2,
+Populacao = 3
+) %>%
+mutate(
+Estado = trimws(Estado),
+Ano = as.integer(Ano)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+# Como pop_raw veio com múltiplas colunas, vamos garantir os nomes corretos
+# Ajustando para usar as duas primeiras colunas (Estado e Populacao)
+populacao <- pop_raw %>%
+rename(
+Estado = 1,
+Populacao = 2
+) %>%
+mutate(
+Estado = trimws(Estado),
+# Criamos a coluna Ano manualmente já que a tabela é uma estimativa para um período fixo
+Ano = 2025
+) %>%
+filter(Estado %in% estados_ne) %>%
+select(Estado, Ano, Populacao)
+#===========================================================
+# 4. BASE PIB (pib-per-capita-r.csv)
+#===========================================================
+# Seu pib_raw tem 2 colunas. Provavelmente "Estado" e "PIB_per_capita"
+pib_raw <- read.csv("pib-per-capita-r.csv", fileEncoding = "UTF-8")
+pib_final <- pib_raw %>%
+rename(
+Estado = 1,
+PIB_per_capita = 2
+) %>%
+mutate(
+Estado = trimws(Estado),
+# Como a tabela tem 12 observações (provavelmente os estados + totais) para um ano específico,
+# vamos definir o Ano correspondente ao dado (ajuste para o ano real do dado se não for 2024)
+Ano = 2024,
+PIB_per_capita = as.numeric(PIB_per_capita)
+) %>%
+filter(Estado %in% estados_ne)
+# 5. PADRONIZAÇÃO E JUNÇÃO FINAL
+#===========================================================
+# Unificando todas as bases tratadas por Estado e Ano
+dados_finais <- energia %>%
+left_join(populacao, by = c("Estado", "Ano")) %>%
+left_join(idhm, by = c("Estado", "Ano")) %>%
+left_join(pib_final, by = c("Estado", "Ano"))
+#===========================================================
+# VISUALIZAÇÃO DOS DADOS INTEGRADOS
+#===========================================================
+glimpse(dados_finais)
+head(dados_finais)
+#===========================================================
+# PACOTES
+#===========================================================
+library(readr)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+library(corrplot)
+#===========================================================
+# CONFIGURAÇÕES DE FILTROS (NORDESTE)
+#===========================================================
+ufs_ne <- c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE")
+estados_ne <- c(
+"Alagoas", "Bahia", "Ceará", "Maranhão", "Paraíba",
+"Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe"
+)
+#===========================================================
+#===========================================================
+# 1. BASE ANEEL (SIGA)
+#===========================================================
+siga <- read.csv2(
+"siga-empreendimentos-geracao.csv",
+fileEncoding = "Latin1",
+stringsAsFactors = FALSE
+)
+# Identifica automaticamente a coluna que contém "EntradaOperacao" ignorando maiúsculas/minúsculas
+coluna_data <- names(siga)[str_detect(names(siga), regex("EntradaOperacao", ignore_case = TRUE))][1]
+energia <- siga %>%
+filter(SigUFPrincipal %in% ufs_ne) %>%
+mutate(
+Estado = case_match(
+SigUFPrincipal,
+"AL" ~ "Alagoas",
+"BA" ~ "Bahia",
+"CE" ~ "Ceará",
+"MA" ~ "Maranhão",
+"PB" ~ "Paraíba",
+"PE" ~ "Pernambuco",
+"PI" ~ "Piauí",
+"RN" ~ "Rio Grande do Norte",
+"SE" ~ "Sergipe"
+),
+# Busca a coluna dinamicamente usando .data[[coluna_data]]
+Data = dmy(.data[[coluna_data]]),
+Ano = year(Data)
+) %>%
+filter(Ano >= 2010 & Ano <= 2024) %>%
+group_by(Estado, Ano) %>%
+summarise(
+Potencia_MW = sum(as.numeric(MdaPotenciaFiscalizadaKw), na.rm = TRUE) / 1000,
+.groups = "drop"
+)
+#===========================================================
+# 2. BASE IDHM (data.xlsx)
+#===========================================================
+idhm_raw <- read_excel("data.xlsx")
+idhm <- idhm_raw %>%
+select(
+Territorialidades,
+matches("^IDHM [0-9]{4}$")
+) %>%
+pivot_longer(
+cols = -Territorialidades,
+names_to = "Ano",
+values_to = "IDHM"
+) %>%
+mutate(
+Ano = as.integer(gsub("IDHM ", "", Ano)),
+Estado = trimws(Territorialidades)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+) %>%
+select(Estado, Ano, IDHM)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+# NOTA: Ajuste os nomes das colunas abaixo ("Nome_da_Coluna_Estado", etc.)
+# de acordo com o que aparecer no seu names(pop_raw)
+populacao <- pop_raw %>%
+# Exemplo caso a planilha venha no formato longo (Estado, Ano, Populacao):
+rename(
+Estado = 1, # Se a primeira coluna for o estado, você pode usar o índice
+Ano = 2,
+Populacao = 3
+) %>%
+mutate(
+Estado = trimws(Estado),
+Ano = as.integer(Ano)
+) %>%
+filter(
+Estado %in% estados_ne,
+Ano >= 2010,
+Ano <= 2024
+)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+# Como pop_raw veio com múltiplas colunas, vamos garantir os nomes corretos
+# Ajustando para usar as duas primeiras colunas (Estado e Populacao)
+populacao <- pop_raw %>%
+rename(
+Estado = 1,
+Populacao = 2
+) %>%
+mutate(
+Estado = trimws(Estado),
+# Criamos a coluna Ano manualmente já que a tabela é uma estimativa para um período fixo
+Ano = 2025
+) %>%
+filter(Estado %in% estados_ne) %>%
+select(Estado, Ano, Populacao)
+#===========================================================
+# 4. BASE PIB (pib-per-capita-r.csv)
+#===========================================================
+# Seu pib_raw tem 2 colunas. Provavelmente "Estado" e "PIB_per_capita"
+pib_raw <- read.csv("pib-per-capita-r.csv", fileEncoding = "UTF-8")
+pib_final <- pib_raw %>%
+rename(
+Estado = 1,
+PIB_per_capita = 2
+) %>%
+mutate(
+Estado = trimws(Estado),
+# Como a tabela tem 12 observações (provavelmente os estados + totais) para um ano específico,
+# vamos definir o Ano correspondente ao dado (ajuste para o ano real do dado se não for 2024)
+Ano = 2024,
+PIB_per_capita = as.numeric(PIB_per_capita)
+) %>%
+filter(Estado %in% estados_ne)
+#===========================================================
+# 5. PADRONIZAÇÃO E JUNÇÃO FINAL
+#===========================================================
+# Como populacao e pib_final contêm apenas um ano de referência por estado,
+# removemos a coluna 'Ano' delas antes do join para não quebrar a série histórica
+pop_join <- populacao %>% select(-Ano)
+pib_join <- pib_final %>% select(-Ano)
+# Unificando as tabelas
+dados_finais <- energia %>%
+# Junta com IDHM por Estado e Ano (ambas possuem a série histórica)
+left_join(idhm, by = c("Estado", "Ano")) %>%
+# Junta com População e PIB apenas por Estado (repetindo o dado recente para os anos)
+left_join(pop_join, by = "Estado") %>%
+left_join(pib_join, by = "Estado")
+#===========================================================
+# VISUALIZAÇÃO DOS DADOS INTEGRADOS
+#===========================================================
+glimpse(dados_finais)
+head(dados_finais)
+#===========================================================
+# PACOTES
+#===========================================================
+library(readr)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(ggplot2)
+library(corrplot)
+#===========================================================
+# CONFIGURAÇÕES DE FILTROS (NORDESTE)
+#===========================================================
+ufs_ne <- c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE")
+# Função auxiliar para transformar qualquer nome de estado do NE em Sigla limpa
+uf_para_sigla <- function(coluna) {
+case_match(
+coluna,
+c("Alagoas", "AL") ~ "AL",
+c("Bahia", "BA") ~ "BA",
+c("Ceará", "CE") ~ "CE",
+c("Maranhão", "MA") ~ "MA",
+c("Paraíba", "PB") ~ "PB",
+c("Pernambuco", "PE") ~ "PE",
+c("Piauí", "PI") ~ "PI",
+c("Rio Grande do Norte", "RN") ~ "RN",
+c("Sergipe", "SE") ~ "SE",
+.default = NA_character_
+)
+}
+#===========================================================
+# 1. BASE ANEEL (SIGA)
+#===========================================================
+siga <- read.csv2(
+"siga-empreendimentos-geracao.csv",
+fileEncoding = "Latin1",
+stringsAsFactors = FALSE
+)
+# Identifica automaticamente a coluna que contém "EntradaOperacao"
+coluna_data <- names(siga)[str_detect(names(siga), regex("EntradaOperacao", ignore_case = TRUE))][1]
+energia <- siga %>%
+filter(SigUFPrincipal %in% ufs_ne) %>%
+mutate(
+UF = SigUFPrincipal,
+Data = dmy(.data[[coluna_data]]),
+Ano = year(Data)
+) %>%
+filter(Ano >= 2010 & Ano <= 2024) %>%
+group_by(UF, Ano) %>%
+summarise(
+Potencia_MW = sum(as.numeric(MdaPotenciaFiscalizadaKw), na.rm = TRUE) / 1000,
+.groups = "drop"
+)
+#===========================================================
+# 2. BASE IDHM (data.xlsx)
+#===========================================================
+idhm_raw <- read_excel("data.xlsx")
+idhm <- idhm_raw %>%
+select(
+Territorialidades,
+matches("^IDHM [0-9]{4}$")
+) %>%
+pivot_longer(
+cols = -Territorialidades,
+names_to = "Ano",
+values_to = "IDHM"
+) %>%
+mutate(
+Ano = as.integer(gsub("IDHM ", "", Ano)),
+Estado_limpo = trimws(Territorialidades),
+UF = uf_para_sigla(Estado_limpo)
+) %>%
+filter(!is.na(UF), Ano >= 2010, Ano <= 2024) %>%
+select(UF, Ano, IDHM)
+#===========================================================
+# 3. BASE POPULAÇÃO (POP2025_20260113.xls)
+#===========================================================
+pop_raw <- read_excel("POP2025_20260113.xls")
+populacao <- pop_raw %>%
+rename(Estado_bruto = 1, Populacao = 2) %>%
+mutate(
+Estado_limpo = trimws(Estado_bruto),
+UF = uf_para_sigla(Estado_limpo)
+) %>%
+filter(!is.na(UF)) %>%
+select(UF, Populacao)
+#===========================================================
+# 4. BASE PIB (pib-per-capita-r.csv)
+#===========================================================
+pib_raw <- read.csv("pib-per-capita-r.csv", fileEncoding = "UTF-8")
+pib_final <- pib_raw %>%
+rename(Estado_bruto = 1, PIB_per_capita = 2) %>%
+mutate(
+Estado_limpo = trimws(Estado_bruto),
+UF = uf_para_sigla(Estado_limpo),
+PIB_per_capita = as.numeric(PIB_per_capita)
+) %>%
+filter(!is.na(UF)) %>%
+select(UF, PIB_per_capita)
+#===========================================================
+# 5. JUNÇÃO FINAL COMPLETA (Usando UF como Chave)
+#===========================================================
+dados_finais <- energia %>%
+# Junta com IDHM combinando perfeitamente a UF e o Ano
+left_join(idhm, by = c("UF", "Ano")) %>%
+# Junta com População e PIB usando apenas a UF
+left_join(populacao, by = "UF") %>%
+left_join(pib_final, by = "UF")
+#===========================================================
+# VERIFICAÇÃO
+#===========================================================
+glimpse(dados_finais)
+print(head(dados_finais, n = 20))
